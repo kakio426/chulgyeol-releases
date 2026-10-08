@@ -1,0 +1,62 @@
+name: Verify public downloads
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published version
+        required: true
+        default: '0.1.0'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download public assets and check integrity
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, re, urllib.request
+          from pathlib import Path
+          version = os.environ['RELEASE_VERSION']
+          assert re.fullmatch(r'\d+\.\d+\.\d+', version)
+          expected = json.loads(Path(f'checksums/v{version}.json').read_text())
+          api = f'https://api.github.com/repos/{os.environ["GITHUB_REPOSITORY"]}/releases/tags/v{version}'
+          request = urllib.request.Request(api, headers={'Authorization': f'Bearer {os.environ["GH_TOKEN"]}', 'User-Agent': 'chulgyeol-download-verification'})
+          with urllib.request.urlopen(request, timeout=30) as response:
+              release = json.load(response)
+          assert release['tag_name'] == 'v'+version and not release['draft'] and not release['prerelease']
+          assets = {asset['name']: asset for asset in release['assets']}
+          results = {}
+          metadata = ''
+          for item in expected['files']:
+              asset = assets[item['name']]
+              assert asset['size'] == item['bytes']
+              request = urllib.request.Request(asset['browser_download_url'], headers={'User-Agent': 'chulgyeol-download-verification'})
+              sha256, sha512, size = hashlib.sha256(), hashlib.sha512(), 0
+              content = bytearray()
+              with urllib.request.urlopen(request, timeout=90) as response:
+                  assert response.status == 200
+                  while chunk := response.read(1024*1024):
+                      sha256.update(chunk); sha512.update(chunk); size += len(chunk)
+                      if item['name'] == 'latest.yml': content.extend(chunk)
+              assert size == item['bytes'] and sha256.hexdigest() == item['sha256'], item['name']
+              results[item['name']] = {'bytes': size, 'sha256': sha256.hexdigest(), 'sha512': base64.b64encode(sha512.digest()).decode()}
+              if content: metadata = content.decode()
+              print('Anonymous download verified:', item['name'], size, sha256.hexdigest())
+          assert re.search(r'^version:\s*(\S+)', metadata, re.M)[1] == version
+          installer = re.search(r'^path:\s*(\S+)', metadata, re.M)[1]
+          assert results[installer]['sha512'] == re.search(r'^sha512:\s*(\S+)', metadata, re.M)[1]
+          assert installer+'.blockmap' in results
+          Path('download-verification.json').write_text(json.dumps({'version': version, 'anonymousDownloads': results, 'metadata': 'verified'}, indent=2)+'\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f'All four public v{version} files downloaded without authentication and matched their recorded hashes. Updater metadata and installer SHA-512 matched.\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: download-verification-${{ inputs.version }}
+          path: download-verification.json

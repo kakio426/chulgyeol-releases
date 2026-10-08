@@ -1,0 +1,25 @@
+{
+  "version": "0.1.0",
+  "files": [
+    {
+      "name": "Chulgyeol-portable-0.1.0.exe",
+      "bytes": 97822452,
+      "sha256": "0e597e069f085ab6370c5b0bdec319c43845b31a0b422dd407d084368d8574e1"
+    },
+    {
+      "name": "Chulgyeol-setup-0.1.0.exe",
+      "bytes": 98072352,
+      "sha256": "81759629aafe2b1372d818a7a22dd38be00b8dfffa4e15eb2b278e82f667c55c"
+    },
+    {
+      "name": "Chulgyeol-setup-0.1.0.exe.blockmap",
+      "bytes": 102504,
+      "sha256": "d21b4e53690f23dc5f7ba1f8daa7cebc7fa00a60ed144769f16132f34755838e"
+    },
+    {
+      "name": "latest.yml",
+      "bytes": 346,
+      "sha256": "66bccdbefd70399194c8ea77c235383c027fc0ee0d61aa0138c5a40b4fe5f8e7"
+    }
+  ]
+}
